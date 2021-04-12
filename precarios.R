@@ -1,19 +1,24 @@
 #titulo. El 10% de la UNAM#
 #Autor: Israel Garcia Solares#
-#idioma: Espa駉l#
+#idioma: Espa帽ol#
 #License: CC4#
 library(ineq)
 library(tidyverse)
 library(plyr)
 
 ####Profesores Carrera####
-carrera<-read.csv("carrera.csv", na.strings=c("", "NA", " "))
+carrera<-read.csv("carrera.csv", na.strings=c("", "NA", " ")) 
+#descargado de http://www.transparencia.unam.mx/obligaciones/consulta/remuneracion-profesores
+
+sni<-read.csv("sni.csv", na.strings=c("", "sin apellido Materno"))
+#Padron de 2018 de la UNAM descargado de https://datos.gob.mx/busca/dataset/sistema-nacional-de-investigadores
+sni2<-read.csv("sni2019.csv")
+#descargado de https://www.conacyt.gob.mx/images/SNI/2019/RESULTADOS_SNI_CONVOCATORIA_2019_INGRESO_O_PERMANENCIA.pdf . Esta version continene los miembros que solicitaron renovaci贸n para 2020#
+sniresto<-read.csv("sni2018.csv")
+#Padron de 2018 general, con el fin de eidentificar los investigadores que migraron a la UNAM, decargado de https://datos.gob.mx/busca/dataset/sistema-nacional-de-investigadores
 colnames(carrera)<-c("unidad", "nombre", "apellido1", "apellido2", "tipo", "bruta", "neta", "estimulos", "total")
 carrera$id<-rownames(carrera)
-sni<-read.csv("sni.csv", na.strings=c("", "sin apellido Materno"))
 colnames(sni)<-c("apellido1", "apellido2", "nombre", "nivel", "institucion", "area")
-sni2<-read.csv("sni2019.csv")
-sniresto<-read.csv("sni2018.csv")
 sni2$nombre<-ifelse(!is.na(str_extract(lag(sni2$text), "^(\\d+)$")), sni2$text, NA)
 sni2$nivel<-ifelse(!is.na(str_extract(lead(sni2$text), "^(\\d+)$")), sni2$text, NA)
 sni2<-fill(sni2, nombre, .direction="down")
@@ -71,7 +76,7 @@ ggplot(data=carreragX, aes(x=orden, y=remuneracion, fill=tipo))+geom_col()
 
 
 ####Profesores de Asginatura y Ayudantes####
-#asumimos una distribuci髇 normal de horas, usando la media de acuerdo al anuario estadistico DGAPA 2020 https://www.planeacion.unam.mx/Agenda/2020/disco/#
+#asumimos una distribuci贸n normal de horas, usando la media de acuerdo al anuario estadistico DGAPA 2020 https://www.planeacion.unam.mx/Agenda/2020/disco/#
 set.seed(2021)
 asignaturaa<-rnorm(n=22011, mean=12.25898414, sd=3.086328048)
 asignaturaa<-as.data.frame(asignaturaa)
@@ -96,9 +101,9 @@ precarios$despensa<-1255
 precarios$asistencia<-precarios$bruta/12
 precarios$extra<-ifelse(precarios$horas>=15, precarios$horas*2.5, 0)
 
-#para agregar la desigualdad basada en el PEPASIG, vamos a suponer una distribuci髇 de de antiguedad que replique la distribuci髇 de horas
-#y el porcentaje hasta 20 a駉s de antiguedad del Anuario Estad韘tico Dgapa 2020 ## 
-#Es una estimaci髇 generosa, en tanto la distribuci髇 de antiguedad acad閙ica favorece a los profesores de carrera en general#
+#para agregar la desigualdad basada en el PEPASIG, vamos a suponer una distribuci贸n de de antiguedad que replique la distribuci贸n de horas
+#y el porcentaje hasta 20 a帽os de antiguedad del Anuario Estad铆stico Dgapa 2020 ## 
+#Es una estimaci贸n generosa, en tanto la distribuci贸n de antiguedad acad茅mica favorece a los profesores de carrera en general#
 precarios<-precarios[order(precarios$horas),]
 precarios$orden<-1:28551
 precarios$ant<-ifelse(precarios$orden<7283, "0-2", 
@@ -109,7 +114,7 @@ precarios$ant<-ifelse(precarios$orden<7283, "0-2",
                ifelse(precarios$orden>=23496&precarios$orden<26097, "15-17", 
                ifelse(precarios$orden>=26097, "18-20", 
                       NA)))))))
-#asignaremos pepasig correspondiente a licenciatura, aunque los profesores de asignatura ocupan tambi閚 alrededor del 50% de las clases de posgrado#
+#asignaremos pepasig correspondiente a licenciatura, aunque los profesores de asignatura ocupan tambi茅n alrededor del 50% de las clases de posgrado#
 #liga aqui https://dgapa.unam.mx/index.php/estimulos/pepasig#
 precarios$pepasig<-ifelse(precarios$ant=="0-2", 0,
                           ifelse(precarios$ant=="3-5", 619,
