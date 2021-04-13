@@ -202,7 +202,7 @@ ggplot(data=todos, aes(x=orden, y=total, fill=nombramiento))+geom_col()+
   
 ggplot(data=todos, aes(x=orden, y=proyectado, fill=nombramiento))+geom_col()+ 
   scale_y_continuous(breaks=c(0,5000,10000, 50000, 100000, 150000, 200000, 250000))+
-  labs(fill = "Nombramiento",y="Remuneración total" , title="Gráfico 3b. Remuneración de profesores de menor a mayor")
+  labs(fill = "Nombramiento",y="Remuneración total" , title="Gráfico 3c. Remuneración de profesores de menor a mayor con limites")
 
 write.csv(tablaingreso, "decilesingreso.csv", row.names = F)
 write.csv(todos, "todes.csv", row.names = F)
