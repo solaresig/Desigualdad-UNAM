@@ -183,27 +183,26 @@ mean(todos$total[which(todos$orden>41423)])
 mean(todos$total[which(todos$orden<11)])
 mean(todos$total[which(todos$orden>41423)])/mean(todos$total[which(todos$orden<11)])
 sobresalario<-todos[which(todos$total>111990),]
-bajosalario<-todos[which(todos$total<3746),]
+bajosalario<-todos[which(todos$total<(2.03577*3746)),]
 sobresalario$sobre<-sobresalario$total-111990
 sum(sobresalario$sobre)
-bajosalario$bajo<-3746-bajosalario$total
+bajosalario$bajo<-(2.0357*3746)-bajosalario$total
 sum(bajosalario$bajo)
-sum(sobresalario$sobre)/(4143*4)
-todos$proyectado<-ifelse(as.numeric(as.character(todos$decil))<5, todos$total+1650.73, 
+todos$proyectado<-ifelse(todos$total<(2.036*3746), 2.036*3746, 
                          ifelse(todos$total>111990, 111990, todos$total))
 Gini(todos$proyectado)/Gini(todos$total)
 
 todosg$tipo<-str_to_title(todosg$tipo)
 ggplot(data=todosg, aes(x=orden, y=remuneracion, fill=tipo))+geom_col()+
-  scale_y_continuous(breaks=c(0,2000,10000, 50000, 100000, 150000, 200000, 250000))+
+  scale_y_continuous(breaks=c(0,5000,10000, 50000, 100000, 150000, 200000, 250000))+
   labs(fill = "Tipo de ingreso",y="Remuneración total" , title="Gráfico 3a. Remuneración de profesores de menor a mayor")
 ggplot(data=todos, aes(x=orden, y=total, fill=nombramiento))+geom_col()+ 
-  scale_y_continuous(breaks=c(0,2000,10000, 50000, 100000, 150000, 200000, 250000))+
+  scale_y_continuous(breaks=c(0,5000,10000, 50000, 100000, 150000, 200000, 250000))+
   labs(fill = "Nombramiento",y="Remuneración total" , title="Gráfico 3b. Remuneración de profesores de menor a mayor")
   
-
-
-ggplot(data=unoporcien, aes(x=orden, y=remuneracion, fill=tipo))+geom_col()
+ggplot(data=todos, aes(x=orden, y=proyectado, fill=nombramiento))+geom_col()+ 
+  scale_y_continuous(breaks=c(0,5000,10000, 50000, 100000, 150000, 200000, 250000))+
+  labs(fill = "Nombramiento",y="Remuneración total" , title="Gráfico 3b. Remuneración de profesores de menor a mayor")
 
 write.csv(tablaingreso, "decilesingreso.csv", row.names = F)
 write.csv(todos, "todes.csv", row.names = F)
