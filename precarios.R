@@ -1,7 +1,8 @@
 #titulo. El 10% de la UNAM#
 #Autor: Israel Garcia Solares#
-#idioma: Espa帽ol#
+#idioma: Espa駉l#
 #License: CC4#
+install.packages("ineq")
 library(ineq)
 library(tidyverse)
 library(plyr)
@@ -9,15 +10,39 @@ library(plyr)
 ####Profesores Carrera####
 carrera<-read.csv("carrera.csv", na.strings=c("", "NA", " ")) 
 #descargado de http://www.transparencia.unam.mx/obligaciones/consulta/remuneracion-profesores
-
+funcionarios<-read.csv("funcionarios.csv", na.strings=c("", "NA", " "))
+funcionariosextra<-read.csv("funcionariosextra.csv", na.strings=c("", "NA", " "))
+#descargados de http://www.transparencia.unam.mx/obligaciones/consulta/remuneracion-personal 
 sni<-read.csv("sni.csv", na.strings=c("", "sin apellido Materno"))
 #Padron de 2018 de la UNAM descargado de https://datos.gob.mx/busca/dataset/sistema-nacional-de-investigadores
 sni2<-read.csv("sni2019.csv")
-#descargado de https://www.conacyt.gob.mx/images/SNI/2019/RESULTADOS_SNI_CONVOCATORIA_2019_INGRESO_O_PERMANENCIA.pdf . Esta version continene los miembros que solicitaron renovaci贸n para 2020#
+#descargado de https://www.conacyt.gob.mx/images/SNI/2019/RESULTADOS_SNI_CONVOCATORIA_2019_INGRESO_O_PERMANENCIA.pdf . Esta version continene los miembros que solicitaron renovaci髇 para 2020#
 sniresto<-read.csv("sni2018.csv")
-#Padron de 2018 general, con el fin de eidentificar los investigadores que migraron a la UNAM, decargado de https://datos.gob.mx/busca/dataset/sistema-nacional-de-investigadores
+#Padron de 2018 general, con el fin de identificar los investigadores que migraron a la UNAM, decargado de https://datos.gob.mx/busca/dataset/sistema-nacional-de-investigadores
+
 colnames(carrera)<-c("unidad", "nombre", "apellido1", "apellido2", "tipo", "bruta", "neta", "estimulos", "total")
 carrera$id<-rownames(carrera)
+carrera$nombre1<-str_extract(carrera$nombre, "^(\\w+)")
+funcionarios$bruta<-str_replace(funcionarios$bruta, "[$]", "")
+funcionarios$bruta<-str_replace(funcionarios$bruta, "(?<=(\\d))[,](?=(\\d))", "")
+funcionarios$bruta<-as.numeric(as.character(funcionarios$bruta))
+funcionariosextra$bruta<-str_replace(funcionariosextra$bruta, "[$]", "")
+funcionariosextra$bruta<-str_replace(funcionariosextra$bruta, "(?<=(\\d))[,](?=(\\d))", "")
+funcionariosextra$bruta<-as.numeric(as.character(funcionariosextra$bruta))
+funcionariosextra$brutas<-ifelse(funcionariosextra$periodicidad=="ANUAL", funcionariosextra$bruta/12, 
+                                 ifelse(funcionariosextra$periodicidad=="SEMESTRAL", funcionariosextra$bruta/6,  
+                                        funcionariosextra$bruta))
+extraf<-ddply(funcionariosextra, 
+              c("id"), 
+              summarize, 
+              estimulos=sum(brutas))
+funcionarios<-left_join(funcionarios, extraf, by="id")
+funcionarios$administrativo<-funcionarios$bruta+funcionarios$estimulos
+funcionarios$nombre1<-str_extract(funcionarios$nombre, "^(\\w+)")
+#adicionar a los profesores de carrera
+carrera<-left_join(carrera, 
+                   subset(funcionarios, select=c("apellido1", "apellido2", "nombre1", "administrativo")), by=c("apellido1", "apellido2", "nombre1"))
+#ahora adicionar los est韒ulos del SNI
 colnames(sni)<-c("apellido1", "apellido2", "nombre", "nivel", "institucion", "area")
 sni2$nombre<-ifelse(!is.na(str_extract(lag(sni2$text), "^(\\d+)$")), sni2$text, NA)
 sni2$nivel<-ifelse(!is.na(str_extract(lead(sni2$text), "^(\\d+)$")), sni2$text, NA)
@@ -42,7 +67,7 @@ carrera$nombr<-str_to_title(str_extract(carrera$nombramiento, "EMERITO"))
 carrera$nombr<-ifelse(is.na(carrera$nombr), 
                       str_to_title(str_extract(carrera$nombramiento, "EMERITO|TECNICO|PROFESOR|INVESTIGADOR")), 
                       carrera$nombr)
-carrera2<-left_join(subset(carrera, select=c("id","name","unidad", "tipo", "bruta", "neta", "estimulos","apellido1", "apellido2", "nombr")),
+carrera2<-left_join(subset(carrera, select=c("id","name","unidad", "tipo", "bruta", "neta", "estimulos","administrativo","apellido1", "apellido2", "nombr")),
                     subset(sni, select=c("apellido1", "apellido2", "nivel")), by=c("apellido1", "apellido2"))
 carrera2<-distinct(carrera2, id, .keep_all = T)
 carrera2a<-subset(carrera2, !is.na(carrera2$nivel))
@@ -50,18 +75,19 @@ carrera2b<-subset(carrera2, is.na(carrera2$nivel))
 carrera2c<-left_join(subset(carrera2b, select=-c(nivel)), sniresto , by="name")
 carrerat<-rbind(carrera2a, carrera2c)
 carreratest<-carrerat[which(!is.na(carrerat$nivel)),]
-carrerat$remsni<-ifelse(carrerat$nivel=="C", 8186.96,
-                        ifelse(carrerat$nivel=="1", 14327.18,
-                               ifelse(carrerat$nivel=="2", 18420.66,
-                                      ifelse(carrerat$nivel=="3", 30701.10,0))))
+carrerat$sni<-ifelse(carrerat$nivel=="C", 8186.96,
+                     ifelse(carrerat$nivel=="1", 14327.18,
+                            ifelse(carrerat$nivel=="2", 18420.66,
+                                   ifelse(carrerat$nivel=="3", 30701.10,0))))
 carrerat$estimulos[is.na(carrerat$estimulos)]<-0
-carrerat$remsni[is.na(carrerat$remsni)]<-0
-carrerat$total<-carrerat$bruta+carrerat$estimulos+carrerat$remsni
-carrerat$totalneto<-carrerat$neta+carrerat$estimulos+carrerat$remsni
+carrerat$sni[is.na(carrerat$sni)]<-0
+carrerat$administrativo[is.na(carrerat$administrativo)]<-0
+carrerat$total<-carrerat$bruta+carrerat$estimulos+carrerat$sni+carrerat$administrativo+1255
+carrerat$totalneto<-carrerat$neta+carrerat$estimulos+carrerat$sni
 carrerat$unidad<-str_to_title(carrerat$unidad)
 carrerat<-carrerat[order(carrerat$total),]
 carrerat$orden<-1:12882
-carrerag<-pivot_longer(subset(carrerat, select=c("name", "orden", "bruta", "estimulos", "remsni")), c("bruta", "estimulos", "remsni"), names_to = "tipo", values_to="remuneracion")
+carrerag<-pivot_longer(subset(carrerat, select=c("name", "orden", "bruta", "estimulos", "sni","administrativo")), c("bruta", "estimulos", "sni", "administrativo"), names_to = "tipo", values_to="remuneracion")
 carrerag<-subset(carrerag, carrerag$remuneracion!=0)
 carrerat$decil<-with(carrerat, cut.default(floor(total), 
                                            breaks=quantile(floor(total), probs=seq(0,1, by=0.1)), 
@@ -70,13 +96,13 @@ carreraX<-carrerat[which(carrerat$decil==10),]
 carreraX$centil<-with(carreraX, cut.default(floor(total), 
                                             breaks=quantile(floor(total), probs=seq(0,1, by=0.1)), 
                                             labels=c(91:100), right=T, include.lowest=T))
-carreragX<-pivot_longer(subset(carreraX, select=c("name", "orden", "bruta", "estimulos", "remsni")), c("bruta", "estimulos", "remsni"), names_to = "tipo", values_to="remuneracion")
+carreragX<-pivot_longer(subset(carreraX, select=c("name", "orden", "bruta", "estimulos", "sni", "administrativo")), c("bruta", "estimulos", "sni", "administrativo"), names_to = "tipo", values_to="remuneracion")
 ggplot(data=carrerag, aes(x=orden, y=remuneracion, fill=tipo))+geom_col()
 ggplot(data=carreragX, aes(x=orden, y=remuneracion, fill=tipo))+geom_col()
 
 
 ####Profesores de Asginatura y Ayudantes####
-#asumimos una distribuci贸n normal de horas, usando la media de acuerdo al anuario estadistico DGAPA 2020 https://www.planeacion.unam.mx/Agenda/2020/disco/#
+#asumimos una distribuci髇 normal de horas, usando la media de acuerdo al anuario estadistico DGAPA 2020 https://www.planeacion.unam.mx/Agenda/2020/disco/#
 set.seed(2021)
 asignaturaa<-rnorm(n=22011, mean=12.25898414, sd=3.086328048)
 asignaturaa<-as.data.frame(asignaturaa)
@@ -101,20 +127,20 @@ precarios$despensa<-1255
 precarios$asistencia<-precarios$bruta/12
 precarios$extra<-ifelse(precarios$horas>=15, precarios$horas*2.5, 0)
 
-#para agregar la desigualdad basada en el PEPASIG, vamos a suponer una distribuci贸n de de antiguedad que replique la distribuci贸n de horas
-#y el porcentaje hasta 20 a帽os de antiguedad del Anuario Estad铆stico Dgapa 2020 ## 
-#Es una estimaci贸n generosa, en tanto la distribuci贸n de antiguedad acad茅mica favorece a los profesores de carrera en general#
+#para agregar la desigualdad basada en el PEPASIG, vamos a suponer una distribuci髇 de de antiguedad que replique la distribuci髇 de horas
+#y el porcentaje hasta 20 a駉s de antiguedad del Anuario Estad韘tico Dgapa 2020 ## 
+#Es una estimaci髇 generosa, en tanto la distribuci髇 de antiguedad acad閙ica favorece a los profesores de carrera en general#
 precarios<-precarios[order(precarios$horas),]
 precarios$orden<-1:28551
 precarios$ant<-ifelse(precarios$orden<7283, "0-2", 
-               ifelse(precarios$orden>=7283&precarios$orden<12862, "3-5", 
-               ifelse(precarios$orden>=12862&precarios$orden<16969, "6-8", 
-               ifelse(precarios$orden>=16969&precarios$orden<20476, "9-11", 
-               ifelse(precarios$orden>=20476&precarios$orden<23496, "12-14", 
-               ifelse(precarios$orden>=23496&precarios$orden<26097, "15-17", 
-               ifelse(precarios$orden>=26097, "18-20", 
-                      NA)))))))
-#asignaremos pepasig correspondiente a licenciatura, aunque los profesores de asignatura ocupan tambi茅n alrededor del 50% de las clases de posgrado#
+                      ifelse(precarios$orden>=7283&precarios$orden<12862, "3-5", 
+                             ifelse(precarios$orden>=12862&precarios$orden<16969, "6-8", 
+                                    ifelse(precarios$orden>=16969&precarios$orden<20476, "9-11", 
+                                           ifelse(precarios$orden>=20476&precarios$orden<23496, "12-14", 
+                                                  ifelse(precarios$orden>=23496&precarios$orden<26097, "15-17", 
+                                                         ifelse(precarios$orden>=26097, "18-20", 
+                                                                NA)))))))
+#asignaremos pepasig correspondiente a licenciatura, aunque los profesores de asignatura ocupan tambi閚 alrededor del 50% de las clases de posgrado#
 #liga aqui https://dgapa.unam.mx/index.php/estimulos/pepasig#
 precarios$pepasig<-ifelse(precarios$ant=="0-2", 0,
                           ifelse(precarios$ant=="3-5", 619,
@@ -129,19 +155,21 @@ precarios$estimulos<-precarios$despensa+precarios$asistencia+precarios$extra+pre
 precarios$orden<-NULL
 precarios$total<-precarios$bruta+precarios$estimulos
 precarios$name<-"Anonime"
-precarios$remsni<-0
+precarios$sni<-0
+precarios$administrativo<-0
 
 ####La distribucion final####
 todos<-rbind(
-  subset(carrerat, select=c("name" , "nombr", "bruta", "estimulos", "remsni", "total")), 
-  subset(precarios, select=c("name" , "nombr", "bruta", "estimulos", "remsni", "total"))
+  subset(carrerat, select=c("name" , "nombr", "bruta", "estimulos", "sni", "administrativo", "total")), 
+  subset(precarios, select=c("name" , "nombr", "bruta", "estimulos", "sni", "administrativo", "total"))
 )
 todos<-todos[order(todos$total),]
 todos$orden<-1:41433
 todos$decil<-with(todos, cut.default(floor(total), 
                                      breaks=quantile(floor(total), probs=seq(0,1, by=0.1)), 
                                      labels=c(1:10), right=T, include.lowest=T))
-todosg<-pivot_longer(subset(todos, select=c("name", "orden", "bruta", "nombr","estimulos", "remsni")), c("bruta", "estimulos", "remsni"), names_to = "tipo", values_to="remuneracion")
+todos$nombramiento<-ifelse(todos$administrativo!=0, "Funcionario", todos$nombr)
+todosg<-pivot_longer(subset(todos, select=c("name", "orden", "bruta", "nombr","estimulos", "sni", "administrativo")), c("bruta", "estimulos", "sni", "administrativo"), names_to = "tipo", values_to="remuneracion")
 todosg<-subset(todosg, todosg$remuneracion!=0)
 unoporcieng<-subset(todosg, todosg$orden>41018.67)
 unoporcien<-subset(todos, todos$orden>41018.67)
@@ -150,12 +178,32 @@ tablaingreso<-ddply(todos,
                     summarize, 
                     ingreso=sum(total))
 Gini(todos$total)
-sum(unoporcien$total)
-sum(todos$total[which(todos$orden<10894)])
+sum(unoporcien$total)-sum(todos$total[which(todos$orden<12776)])
+mean(todos$total[which(todos$orden>41423)])
+mean(todos$total[which(todos$orden<11)])
+mean(todos$total[which(todos$orden>41423)])/mean(todos$total[which(todos$orden<11)])
+sobresalario<-todos[which(todos$total>111990),]
+bajosalario<-todos[which(todos$total<3746),]
+sobresalario$sobre<-sobresalario$total-111990
+sum(sobresalario$sobre)
+bajosalario$bajo<-3746-bajosalario$total
+sum(bajosalario$bajo)
+sum(sobresalario$sobre)/(4143*4)
+todos$proyectado<-ifelse(as.numeric(as.character(todos$decil))<5, todos$total+1650.73, 
+                         ifelse(todos$total>111990, 111990, todos$total))
+Gini(todos$proyectado)/Gini(todos$total)
 
-ggplot(data=todosg, aes(x=orden, y=remuneracion, fill=tipo))+geom_col()
-ggplot(data=todos, aes(x=orden, y=total, fill=nombr))+geom_col()
+todosg$tipo<-str_to_title(todosg$tipo)
+ggplot(data=todosg, aes(x=orden, y=remuneracion, fill=tipo))+geom_col()+
+  scale_y_continuous(breaks=c(0,2000,10000, 50000, 100000, 150000, 200000, 250000))+
+  labs(fill = "Tipo de ingreso",y="Remuneraci髇 total" , title="Gr醘ico 3a. Remuneraci髇 de profesores de menor a mayor")
+ggplot(data=todos, aes(x=orden, y=total, fill=nombramiento))+geom_col()+ 
+  scale_y_continuous(breaks=c(0,2000,10000, 50000, 100000, 150000, 200000, 250000))+
+  labs(fill = "Nombramiento",y="Remuneraci髇 total" , title="Gr醘ico 3b. Remuneraci髇 de profesores de menor a mayor")
+  
+
+
 ggplot(data=unoporcien, aes(x=orden, y=remuneracion, fill=tipo))+geom_col()
 
-write.csv(tablaingreso, "tablaingreso.csv", row.names = F)
-write.csv(todos, "todos.csv", row.names = F)
+write.csv(tablaingreso, "decilesingreso.csv", row.names = F)
+write.csv(todos, "todes.csv", row.names = F)
