@@ -1,23 +1,25 @@
 #titulo. El 10% de la UNAM#
 #Autor: Israel Garcia Solares#
-#idioma: Español#
+#idioma: Espa?ol#
 #License: CC4#
 install.packages("ineq")
 library(ineq)
 library(tidyverse)
 library(plyr)
-
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 ####Profesores Carrera####
-carrera<-read.csv("carrera.csv", na.strings=c("", "NA", " ")) 
+carrera<-read_csv("carrera.csv") 
 #descargado de http://www.transparencia.unam.mx/obligaciones/consulta/remuneracion-profesores
-funcionarios<-read.csv("funcionarios.csv", na.strings=c("", "NA", " "))
-funcionariosextra<-read.csv("funcionariosextra.csv", na.strings=c("", "NA", " "))
+funcionarios<-read_csv("funcionarios.csv")
+funcionariosextra<-read_csv("funcionariosextra.csv")
+funcionariosextra<-subset(funcionariosextra, !str_detect(funcionariosextra$denominacion, "OTROS(\\s)INGRESOS"))
 #descargados de http://www.transparencia.unam.mx/obligaciones/consulta/remuneracion-personal 
-sni<-read.csv("sni.csv", na.strings=c("", "sin apellido Materno"))
+sni<-read_csv("sni.csv")
+sni$`Apellido Materno`[which(sni$`Apellido Materno`=="sin apellido Materno")]<-NA
 #Padron de 2018 de la UNAM descargado de https://datos.gob.mx/busca/dataset/sistema-nacional-de-investigadores
-sni2<-read.csv("sni2019.csv")
-#descargado de https://www.conacyt.gob.mx/images/SNI/2019/RESULTADOS_SNI_CONVOCATORIA_2019_INGRESO_O_PERMANENCIA.pdf . Esta version continene los miembros que solicitaron renovación para 2020#
-sniresto<-read.csv("sni2018.csv")
+sni2<-read_csv("sni2019.csv")
+#descargado de https://www.conacyt.gob.mx/images/SNI/2019/RESULTADOS_SNI_CONVOCATORIA_2019_INGRESO_O_PERMANENCIA.pdf . Esta version continene los miembros que solicitaron renovaci?n para 2020#
+sniresto<-read_csv("sni2018.csv")
 #Padron de 2018 general, con el fin de identificar los investigadores que migraron a la UNAM, decargado de https://datos.gob.mx/busca/dataset/sistema-nacional-de-investigadores
 
 colnames(carrera)<-c("unidad", "nombre", "apellido1", "apellido2", "tipo", "bruta", "neta", "estimulos", "total")
@@ -42,7 +44,7 @@ funcionarios$nombre1<-str_extract(funcionarios$nombre, "^(\\w+)")
 #adicionar a los profesores de carrera
 carrera<-left_join(carrera, 
                    subset(funcionarios, select=c("apellido1", "apellido2", "nombre1", "administrativo")), by=c("apellido1", "apellido2", "nombre1"))
-#ahora adicionar los estímulos del SNI
+#ahora adicionar los est?mulos del SNI
 colnames(sni)<-c("apellido1", "apellido2", "nombre", "nivel", "institucion", "area")
 sni2$nombre<-ifelse(!is.na(str_extract(lag(sni2$text), "^(\\d+)$")), sni2$text, NA)
 sni2$nivel<-ifelse(!is.na(str_extract(lead(sni2$text), "^(\\d+)$")), sni2$text, NA)
@@ -102,7 +104,7 @@ ggplot(data=carreragX, aes(x=orden, y=remuneracion, fill=tipo))+geom_col()
 
 
 ####Profesores de Asginatura y Ayudantes####
-#asumimos una distribución normal de horas, usando la media de acuerdo al anuario estadistico DGAPA 2020 https://www.planeacion.unam.mx/Agenda/2020/disco/#
+#asumimos una distribuci?n normal de horas, usando la media de acuerdo al anuario estadistico DGAPA 2020 https://www.planeacion.unam.mx/Agenda/2020/disco/#
 set.seed(2021)
 asignaturaa<-rnorm(n=22011, mean=12.25898414, sd=3.086328048)
 asignaturaa<-as.data.frame(asignaturaa)
@@ -127,9 +129,9 @@ precarios$despensa<-1255
 precarios$asistencia<-precarios$bruta/12
 precarios$extra<-ifelse(precarios$horas>=15, precarios$horas*2.5, 0)
 
-#para agregar la desigualdad basada en el PEPASIG, vamos a suponer una distribución de de antiguedad que replique la distribución de horas
-#y el porcentaje hasta 20 años de antiguedad del Anuario Estadístico Dgapa 2020 ## 
-#Es una estimación generosa, en tanto la distribución de antiguedad académica favorece a los profesores de carrera en general#
+#para agregar la desigualdad basada en el PEPASIG, vamos a suponer una distribuci?n de de antiguedad que replique la distribuci?n de horas
+#y el porcentaje hasta 20 a?os de antiguedad del Anuario Estad?stico Dgapa 2020 ## 
+#Es una estimaci?n generosa, en tanto la distribuci?n de antiguedad acad?mica favorece a los profesores de carrera en general#
 precarios<-precarios[order(precarios$horas),]
 precarios$orden<-1:28551
 precarios$ant<-ifelse(precarios$orden<7283, "0-2", 
@@ -140,7 +142,7 @@ precarios$ant<-ifelse(precarios$orden<7283, "0-2",
                                                   ifelse(precarios$orden>=23496&precarios$orden<26097, "15-17", 
                                                          ifelse(precarios$orden>=26097, "18-20", 
                                                                 NA)))))))
-#asignaremos pepasig correspondiente a licenciatura, aunque los profesores de asignatura ocupan también alrededor del 50% de las clases de posgrado#
+#asignaremos pepasig correspondiente a licenciatura, aunque los profesores de asignatura ocupan tambi?n alrededor del 50% de las clases de posgrado#
 #liga aqui https://dgapa.unam.mx/index.php/estimulos/pepasig#
 precarios$pepasig<-ifelse(precarios$ant=="0-2", 0,
                           ifelse(precarios$ant=="3-5", 619,
@@ -195,14 +197,14 @@ Gini(todos$proyectado)/Gini(todos$total)
 todosg$tipo<-str_to_title(todosg$tipo)
 ggplot(data=todosg, aes(x=orden, y=remuneracion, fill=tipo))+geom_col()+
   scale_y_continuous(breaks=c(0,5000,10000, 50000, 100000, 150000, 200000, 250000))+
-  labs(fill = "Tipo de ingreso",y="Remuneración total" , title="Gráfico 3a. Remuneración de profesores de menor a mayor")
+  labs(fill = "Tipo de ingreso",y="Remuneraci?n total" , title="Gr?fico 3a. Remuneraci?n de profesores de menor a mayor")
 ggplot(data=todos, aes(x=orden, y=total, fill=nombramiento))+geom_col()+ 
   scale_y_continuous(breaks=c(0,5000,10000, 50000, 100000, 150000, 200000, 250000))+
-  labs(fill = "Nombramiento",y="Remuneración total" , title="Gráfico 3b. Remuneración de profesores de menor a mayor")
+  labs(fill = "Nombramiento",y="Remuneraci?n total" , title="Gr?fico 3b. Remuneraci?n de profesores de menor a mayor")
   
 ggplot(data=todos, aes(x=orden, y=proyectado, fill=nombramiento))+geom_col()+ 
   scale_y_continuous(breaks=c(0,5000,10000, 50000, 100000, 150000, 200000, 250000))+
-  labs(fill = "Nombramiento",y="Remuneración total" , title="Gráfico 3c. Remuneración de profesores de menor a mayor con limites")
+  labs(fill = "Nombramiento",y="Remuneraci?n total" , title="Gr?fico 3c. Remuneraci?n de profesores de menor a mayor con limites")
 
 write.csv(tablaingreso, "decilesingreso.csv", row.names = F)
 write.csv(todos, "todes.csv", row.names = F)
